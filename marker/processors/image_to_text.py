@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import io
 from copy import deepcopy
-from typing import Optional
+from typing import Optional, List
 
 import markdown2
 import requests
@@ -20,19 +20,16 @@ class ImageToTextProcessor(BaseProcessor):
 
     block_types = (BlockTypes.Picture, BlockTypes.Figure)
 
-    def __init__(
-        self,
-        config: Optional[dict] = None,
-        ollama_url: str = "http://localhost:11434",
-        ollama_model: str = "llama3.2-vision:11b",
-        vision_prompt: str = (
-            "Describe this image precisely in technical terms. Focus on diagrams, code, text, and technical content."
-        ),
-    ) -> None:
+    def __init__(self, config: Optional[dict] = None) -> None:
         super().__init__(config)
-        self.ollama_url = ollama_url.rstrip("/")
-        self.ollama_model = ollama_model
-        self.vision_prompt = vision_prompt
+        if config is None:
+            config = {}
+        self.ollama_url = config.get("ollama_url", "http://localhost:11434").rstrip("/")
+        self.ollama_model = config.get("ollama_model", "llama3.2-vision:11b")
+        self.vision_prompt = config.get(
+            "vision_prompt",
+            "Describe this image precisely in technical terms. Focus on diagrams, code, text, and technical content.",
+        )
 
     def process_image_to_text(self, image: Image.Image) -> str:
         """Convert an image to a markdown description using the Ollama service."""
@@ -87,11 +84,12 @@ def create_converter_with_image_to_text(
     vision_prompt: str = (
         "Describe this image precisely in technical terms. Focus on diagrams, code, text, and technical content."
     ),
-):
+) -> "PdfConverter":
     """Return a PdfConverter that applies ImageToTextProcessor."""
     from marker.converters.pdf import PdfConverter
     from marker.models import create_model_dict
     from marker.config.parser import ConfigParser
+    from marker.util import classes_to_strings
 
     if config is None:
         config = {"extract_images": True, "output_dir": "output"}
@@ -99,16 +97,20 @@ def create_converter_with_image_to_text(
     if "page_range" in config and isinstance(config["page_range"], list):
         config["page_range"] = ",".join(str(p) for p in config["page_range"])
 
+    # Store ollama params so the processor can access them
+    config.update({
+        "ollama_url": ollama_url,
+        "ollama_model": ollama_model,
+        "vision_prompt": vision_prompt,
+    })
+
     config_parser = ConfigParser(config)
     processors = config_parser.get_processors()
-    processors.append(
-        ImageToTextProcessor(
-            config=config,
-            ollama_url=ollama_url,
-            ollama_model=ollama_model,
-            vision_prompt=vision_prompt,
-        )
-    )
+    if processors is None:
+        processors = classes_to_strings(list(PdfConverter.default_processors) + [ImageToTextProcessor])
+    else:
+        processors.append("marker.processors.image_to_text.ImageToTextProcessor")
+
     converter = PdfConverter(
         artifact_dict=create_model_dict(),
         config=config_parser.generate_config_dict(),

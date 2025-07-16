@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 """
-Minimal script: run Marker with ImageToDescriptionProcessor via LLMSimpleBlockMetaProcessor.
+Minimal script: run Marker with ``ImageToDescriptionProcessor``.
 """
 
 from pathlib import Path
 
 from image_to_description import ImageToDescriptionProcessor
-from marker.processors.llm.llm_meta import LLMSimpleBlockMetaProcessor
 from marker.converters.pdf import PdfConverter
 from marker.models import create_model_dict
 from marker.config.parser import ConfigParser
@@ -28,22 +27,13 @@ config = {
     # "gemini_api_key": "your_key_here",
 }
 
-# Instantiate your processor
-image_processor = ImageToDescriptionProcessor(config=config)
-
-# Instantiate your LLM service (replace with your real service)
-# from marker.services.ollama import OllamaService
-# llm_service = OllamaService(config)
-llm_service = "gemma3:4b"  # <-- Replace with your actual LLM service
-
-# Wrap with LLMSimpleBlockMetaProcessor
-meta_processor = LLMSimpleBlockMetaProcessor([image_processor], llm_service, config)
-
-# Create converter with the meta processor
+# Create converter with the processor class
 converter = PdfConverter(
     artifact_dict=create_model_dict(),
     config=ConfigParser(config).generate_config_dict(),
-    processor_list=[meta_processor],
+    processor_list=[ImageToDescriptionProcessor],
+    # Replace with your actual LLM service if needed
+    llm_service="marker.services.ollama.OllamaService",
 )
 
 # Run conversion and save markdown
